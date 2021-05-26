@@ -8,15 +8,10 @@
 #include <string>
 #include <utility>
 #include <array>
+#include <windows.h>
 
 using namespace std;
 
-// Utils file
-uint8_t readByte(int bytes, int byte) {
-	return (bytes >> byte * 8) & 0xff;
-}
-
-#include <windows.h>
 struct Display {
 	HWND myconsole{};
 	HDC mydc{};
@@ -40,12 +35,7 @@ struct Display {
 	}
 
 	void writePixel(array<uint8_t, 4>& color, int x, int y) {
-		//Choose any color
-		//COLORREF COLOR = RGB(color == 1 ? 255 : 0, color == 2 ? 255 : 0, 0);
-		//COLORREF COLOR = RGB(255, 0, 0);
-		/*COLORREF COLOR = RGB(readByte(color, 1), readByte(color, 2), readByte(color, 0));*/
 		COLORREF COLOR = RGB(color[2], color[1], color[0]);
-		//SetPixel(mydc, x, y, COLOR);
 		x *= scale;
 		y *= scale;
 		auto curHeight = height * scale;
@@ -61,14 +51,6 @@ struct DisplayStub {
 	uint32_t width{}, height{};
 	DisplayStub(uint32_t width, uint32_t height): width{width}, height{height} {
 
-	}
-	void writePixel(int color, int x, int y) {
-		switch (color) {
-		case 0: cout << ' '; break;
-		case 1: cout << '\xDB'; break;
-			// Bad symbol (not black and not white)
-		case 2: cout << '#'; break;
-		}
 	}
 };
 
@@ -134,21 +116,11 @@ int main(int argc, char** argv)
 		binRead(reinterpret_cast<char*>(&res), 3);
 		curPos += 3;
 
-		/*int resInt = 0;
-		resInt += res[0] << 16;
-		resInt += res[1] << 8;
-		resInt += res[2];*/
 		array<uint8_t, 4> resAr{};
 		resAr[2] = res[2];
 		resAr[1] = res[1];
 		resAr[0] = res[0];
 		return resAr;
-
-		/*if (res[0] == 0 && res[1] == 0 && res[2] == 0)
-			return 0;
-		else if (res[0] == 255 && res[1] == 255 && res[2] == 255)
-			return 1;
-		else return 2;*/
 	};
 
 	auto printNewLine = []() {
@@ -182,13 +154,8 @@ int main(int argc, char** argv)
 	if (biPlanes != 1 || biCompression != 0) {
 		error("biPlanes != 1 or biCompression != 0 don't supported");
 	}
-
-	// Commented because sometimes it's zeros
-	//uint32_t biSizeImage = readNum(curPos); 
 	uint32_t biSizeImage = biWidth * biHeight * (biBitCount / 8);
 
-	//// Set current Display
-//DisplayStub display{biWidth, biHeight};
 	Display display{ biWidth, biHeight };
 
 	auto printPixel = [&display](array<uint8_t, 4>& pixel, int x, int y) {
@@ -199,15 +166,9 @@ int main(int argc, char** argv)
 	const uint8_t alignDiv = 4;
 	const uint8_t align = alignDiv - ((biWidth * bytespp) % alignDiv);
 	bool bFixAlign = align % alignDiv;
-	//for (size_t j = biHeight; j > 0; --j) {
 	curPos = offset;
-	//size_t alignSum = 0;
 	for (size_t j = 0; j < biHeight; ++j) {
-		//curPos = offset + (j) * biHeight * bytespp;
-		/*if (bFixAlign)
-			curPos += (j - 1) * align;*/
-		/*if (bFixAlign)
-			curPos += (j) * align;*/
+
 
 		for (size_t i = 0; i < biWidth; ++i)
 		{
@@ -217,15 +178,13 @@ int main(int argc, char** argv)
 			if (bFixAlign) {
 				if ((i + 1) == biWidth) {
 					curPos += align;
-					//setPos(curPos);
-					//printNewLine();
 				}
 			}
 		}
-		//curPos -= biWidth * bytespp + align;
 	}
 	///////// end Reading bytes /////////
 
 	fin.close();
 	cin.ignore();
 }
+
