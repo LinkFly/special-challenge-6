@@ -10,6 +10,66 @@
 
 using namespace std;
 
+// Utils file
+uint8_t readByte(int bytes, int byte) {
+	return (bytes >> byte * 8) & 0xff;
+}
+
+#include <windows.h>
+struct Display {
+	HWND myconsole{};
+	HDC mydc{};
+	uint32_t width{}, height{};
+	int scale = 5;
+
+	Display() {
+		//Get a console handle
+		myconsole = GetConsoleWindow();
+		//Get a handle to device context
+		mydc = GetDC(myconsole);
+	}	
+
+	Display(uint32_t width, uint32_t height) : Display() {
+		this->width = width;
+		this->height = height;
+	}
+
+	~Display() {
+		ReleaseDC(myconsole, mydc);
+	}
+
+	void writePixel(int color, int x, int y) {
+		//Choose any color
+		//COLORREF COLOR = RGB(color == 1 ? 255 : 0, color == 2 ? 255 : 0, 0);
+		//COLORREF COLOR = RGB(255, 0, 0);
+		COLORREF COLOR = RGB(readByte(color, 2), readByte(color, 1), readByte(color, 0));
+		//SetPixel(mydc, x, y, COLOR);
+		x *= scale;
+		y *= scale;
+		auto curHeight = height * scale;
+		y = curHeight - y;
+		//Draw pixels
+		for (int i = 0; i < scale; ++i)
+			for(int j = 0; j < scale; ++j)
+				SetPixel(mydc, x + i, y + j, COLOR);
+	}
+};
+
+struct DisplayStub {
+	uint32_t width{}, height{};
+	DisplayStub(uint32_t width, uint32_t height): width{width}, height{height} {
+
+	}
+	void writePixel(int color, int x, int y) {
+		switch (color) {
+		case 0: cout << ' '; break;
+		case 1: cout << '\xDB'; break;
+			// Bad symbol (not black and not white)
+		case 2: cout << '#'; break;
+		}
+	}
+};
+
 void error(string errMsg, const string extraMsg = "") {
 	cerr << errMsg << extraMsg << endl;
 	exit(-1);
@@ -71,20 +131,18 @@ int main(int argc, char** argv)
 		uint8_t res[3];
 		binRead(reinterpret_cast<char*>(&res), 3);
 		curPos += 3;
+
+		int resInt = 0;
+		resInt += res[2] << 16;
+		resInt += res[1] << 8;
+		resInt += res[0];
+		return resInt;
+
 		if (res[0] == 0 && res[1] == 0 && res[2] == 0)
 			return 0;
 		else if (res[0] == 255 && res[1] == 255 && res[2] == 255)
 			return 1;
 		else return 2;
-	};
-
-	auto printPixel = [](int pixel) {
-		switch (pixel) {
-		case 0: cout << ' '; break;
-		case 1: cout << '\xDB'; break;
-		// Bad symbol (not black and not white)
-		case 2: cout << '#'; break;
-		}
 	};
 
 	auto printNewLine = []() {
@@ -118,27 +176,39 @@ int main(int argc, char** argv)
 	if (biPlanes != 1 || biCompression != 0) {
 		error("biPlanes != 1 or biCompression != 0 don't supported");
 	}
+
 	// Commented because sometimes it's zeros
 	//uint32_t biSizeImage = readNum(curPos); 
 	uint32_t biSizeImage = biWidth * biHeight * (biBitCount / 8);
+
+	//// Set current Display
+//DisplayStub display{biWidth, biHeight};
+	Display display{ biWidth, biHeight };
+
+	auto printPixel = [&display](int pixel, int x, int y) {
+		display.writePixel(pixel, x, y);
+	};
 
 	//// Read pixels
 	const uint8_t alignDiv = 4;
 	const uint8_t align = alignDiv - ((biWidth * bytespp) % alignDiv);
 	bool bFixAlign = align % alignDiv;
-	for (size_t j = biHeight; j > 0; --j) {
-		curPos = offset + (j - 1) * biHeight * bytespp;
+	//for (size_t j = biHeight; j > 0; --j) {
+	for (size_t j = 0; j < biHeight; ++j) {
+		curPos = offset + (j) * biHeight * bytespp;
+		/*if (bFixAlign)
+			curPos += (j - 1) * align;*/
 		if (bFixAlign)
-			curPos += (j - 1) * align;
+			curPos += (j) * align;
 		setPos(curPos);
 		for (size_t i = 0; i < biWidth; ++i)
 		{
-			printPixel(readPixel(curPos));
+			printPixel(readPixel(curPos), i, j);
 			// align position
 			if (bFixAlign) {
 				if ((i + 1) == biWidth) {
 					curPos += align;
-					printNewLine();
+					//printNewLine();
 				}
 			}
 		}
@@ -146,4 +216,5 @@ int main(int argc, char** argv)
 	///////// end Reading bytes /////////
 
 	fin.close();
+	cin.ignore();
 }
