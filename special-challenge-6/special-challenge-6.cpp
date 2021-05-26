@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <array>
 
 using namespace std;
 
@@ -38,11 +39,12 @@ struct Display {
 		ReleaseDC(myconsole, mydc);
 	}
 
-	void writePixel(int color, int x, int y) {
+	void writePixel(array<uint8_t, 4>& color, int x, int y) {
 		//Choose any color
 		//COLORREF COLOR = RGB(color == 1 ? 255 : 0, color == 2 ? 255 : 0, 0);
 		//COLORREF COLOR = RGB(255, 0, 0);
-		COLORREF COLOR = RGB(readByte(color, 2), readByte(color, 1), readByte(color, 0));
+		/*COLORREF COLOR = RGB(readByte(color, 1), readByte(color, 2), readByte(color, 0));*/
+		COLORREF COLOR = RGB(color[2], color[1], color[0]);
 		//SetPixel(mydc, x, y, COLOR);
 		x *= scale;
 		y *= scale;
@@ -132,17 +134,21 @@ int main(int argc, char** argv)
 		binRead(reinterpret_cast<char*>(&res), 3);
 		curPos += 3;
 
-		int resInt = 0;
-		resInt += res[2] << 16;
+		/*int resInt = 0;
+		resInt += res[0] << 16;
 		resInt += res[1] << 8;
-		resInt += res[0];
-		return resInt;
+		resInt += res[2];*/
+		array<uint8_t, 4> resAr{};
+		resAr[2] = res[2];
+		resAr[1] = res[1];
+		resAr[0] = res[0];
+		return resAr;
 
-		if (res[0] == 0 && res[1] == 0 && res[2] == 0)
+		/*if (res[0] == 0 && res[1] == 0 && res[2] == 0)
 			return 0;
 		else if (res[0] == 255 && res[1] == 255 && res[2] == 255)
 			return 1;
-		else return 2;
+		else return 2;*/
 	};
 
 	auto printNewLine = []() {
@@ -185,7 +191,7 @@ int main(int argc, char** argv)
 //DisplayStub display{biWidth, biHeight};
 	Display display{ biWidth, biHeight };
 
-	auto printPixel = [&display](int pixel, int x, int y) {
+	auto printPixel = [&display](array<uint8_t, 4>& pixel, int x, int y) {
 		display.writePixel(pixel, x, y);
 	};
 
@@ -194,24 +200,29 @@ int main(int argc, char** argv)
 	const uint8_t align = alignDiv - ((biWidth * bytespp) % alignDiv);
 	bool bFixAlign = align % alignDiv;
 	//for (size_t j = biHeight; j > 0; --j) {
+	curPos = offset;
+	//size_t alignSum = 0;
 	for (size_t j = 0; j < biHeight; ++j) {
-		curPos = offset + (j) * biHeight * bytespp;
+		//curPos = offset + (j) * biHeight * bytespp;
 		/*if (bFixAlign)
 			curPos += (j - 1) * align;*/
-		if (bFixAlign)
-			curPos += (j) * align;
-		setPos(curPos);
+		/*if (bFixAlign)
+			curPos += (j) * align;*/
+
 		for (size_t i = 0; i < biWidth; ++i)
 		{
-			printPixel(readPixel(curPos), i, j);
+			auto pixel = readPixel(curPos);
+			printPixel(pixel, i, j);
 			// align position
 			if (bFixAlign) {
 				if ((i + 1) == biWidth) {
 					curPos += align;
+					//setPos(curPos);
 					//printNewLine();
 				}
 			}
 		}
+		//curPos -= biWidth * bytespp + align;
 	}
 	///////// end Reading bytes /////////
 
